@@ -8,9 +8,15 @@ from pathlib import Path
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
-from container_format import GCM_TAG_SIZE, encrypted_region_end, read_header
+from container_format import (
+    GCM_TAG_SIZE,
+    encrypted_region_end,
+    read_header,
+    read_signature_trailer,
+)
 from envelope import unwrap_key_for_identity, unwrap_key_with_password
 from keys import load_private_identity
+from signatures import enforce_signature_policy, verify_signature_document
 from util import b64d, unique_path
 
 CHUNK_SIZE = 1024 * 1024
@@ -248,6 +254,7 @@ def decrypt_file(
     identity_path: str | Path | None = None,
     identity_passphrase: str | None = None,
     output_path: str | Path | None = None,
+    trust_store_path: str | Path | None = None,
 ) -> Path:
     source = Path(input_path)
 
@@ -271,6 +278,19 @@ def decrypt_file(
         header,
         payload_offset,
     )
+
+    signature_doc, signed_region_end = read_signature_trailer(
+        source, prefix=prefix
+    )
+    enforce_signature_policy(header, signature_doc)
+    signature_report = verify_signature_document(
+        source,
+        signature_doc,
+        signed_region_end,
+        trust_store_path=trust_store_path,
+    )
+    if signature_report.get("trust_status") == "blocked":
+        raise ValueError("Capsule is signed by a locally blocked identity.")
 
     return _decrypt_verified_to_output(
         source,
