@@ -20,6 +20,7 @@
         <button class="nav-item" data-page="encrypt">Encrypt</button>
         <button class="nav-item" data-page="decrypt">Decrypt</button>
         <button class="nav-item" data-page="identity">Identities</button>
+        <button class="nav-item" data-page="contacts">Contacts</button>
         <button class="nav-item" data-page="inspect">Inspect & Verify</button>
         <button class="nav-item" data-page="attack">Attack Lab</button>
         <button class="nav-item" data-page="planner">Policy Planner</button>
@@ -35,6 +36,7 @@
         <div class="top-status">
           <span class="chip">AES-256-GCM</span>
           <span class="chip">X25519</span>
+          <span class="chip">Ed25519 signatures</span>
           <span class="chip">Local-first</span>
         </div>
       </header>
@@ -49,8 +51,8 @@
             <div class="section-kicker">Overview</div>
             <h2>Protect, verify, and manage files from one local workspace.</h2>
             <p>
-              Use password protection or recipient-based encryption, inspect capsules,
-              generate receipts, and run controlled tamper checks without leaving the application.
+              Use password protection or recipient-based encryption, sign capsules,
+              verify senders, generate receipts, and run controlled tamper checks locally.
             </p>
           </div>
           <div class="overview-actions">
@@ -76,9 +78,9 @@
             <small>Single and multi-recipient support</small>
           </div>
           <div class="metric-card">
-            <span class="metric-label">Metadata handling</span>
-            <strong>Encrypted</strong>
-            <small>Filename and size are protected</small>
+            <span class="metric-label">Sender authenticity</span>
+            <strong>Ed25519</strong>
+            <small>Optional signed capsules with local trust status</small>
           </div>
         </div>
 
@@ -96,6 +98,7 @@
                 <li>Password-based encryption</li>
                 <li>Recipient-based encryption</li>
                 <li>Multi-recipient access control</li>
+                <li>Sender signatures and trusted contacts</li>
                 <li>Verification and security receipts</li>
                 <li>Controlled tamper simulation</li>
                 <li>Policy planning</li>
@@ -107,7 +110,7 @@
                 <li>Post-quantum protection</li>
                 <li>Threshold recovery</li>
                 <li>Independent security audit</li>
-                <li>External cloud sync</li>
+                <li>Hardware-backed private keys</li>
               </ul>
             </div>
           </div>
@@ -165,10 +168,26 @@
             <div class="field">
               <label>Recipient public keys</label>
               <div class="file-row">
-                <input id="recipientKeys" readonly placeholder="No public keys selected">
+                <input id="recipientKeys" readonly placeholder="No public identities selected">
                 <button class="secondary" id="pickRecipientKeys">Browse</button>
               </div>
-              <small class="hint">Choose one or more .aegis-public.json files.</small>
+              <small class="hint">Choose one or more .aegis-public.json identity files.</small>
+            </div>
+          </div>
+
+          <div class="subsection">
+            <div class="subsection-title">Sender signature <span>Optional</span></div>
+            <p class="hint">Sign the finished capsule so recipients can verify who created it.</p>
+            <div class="field">
+              <label>Private signing identity</label>
+              <div class="file-row">
+                <input id="encryptSignerIdentity" readonly placeholder="No signing identity selected">
+                <button class="secondary" id="pickEncryptSigner">Browse</button>
+              </div>
+            </div>
+            <div class="field">
+              <label>Signing-identity passphrase</label>
+              <input id="encryptSignerPassphrase" type="password">
             </div>
           </div>
 
@@ -223,8 +242,8 @@
         <div class="panel">
           <div class="panel-head">
             <div>
-              <h3>Create recipient identity</h3>
-              <p>Create an X25519 public key and a passphrase-protected private key.</p>
+              <h3>Create identity</h3>
+              <p>Create one identity with X25519 for recipient encryption and Ed25519 for sender signatures.</p>
             </div>
           </div>
 
@@ -249,12 +268,47 @@
         </div>
       </section>
 
+      <section class="page" id="page-contacts">
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h3>Trusted contacts</h3>
+              <p>Import public identities and keep a local trust decision for signature checks.</p>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Public identity</label>
+            <div class="file-row">
+              <input id="contactPublicIdentity" readonly placeholder="No public identity selected">
+              <button class="secondary" id="pickContactIdentity">Browse</button>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Initial trust state</label>
+            <select id="contactTrust">
+              <option value="unverified" selected>Unverified</option>
+              <option value="trusted">Trusted</option>
+              <option value="blocked">Blocked</option>
+            </select>
+          </div>
+
+          <div class="action-row">
+            <button class="primary" id="contactImportAction">Import contact</button>
+            <button class="secondary" id="contactsRefreshAction">Refresh list</button>
+          </div>
+
+          <pre class="result" id="contactsResult">No contacts loaded.</pre>
+        </div>
+      </section>
+
       <section class="page" id="page-inspect">
         <div class="panel">
           <div class="panel-head">
             <div>
               <h3>Inspect and verify</h3>
-              <p>Inspection reads public container metadata. Verification authenticates the capsule.</p>
+              <p>Inspection reads public container metadata. Verification authenticates the payload and sender signature.</p>
             </div>
           </div>
 
