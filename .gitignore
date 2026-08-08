@@ -1,0 +1,29 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Local keys and encrypted data
+keys/*
+!keys/.gitkeep
+encrypted_files/*
+!encrypted_files/.gitkeep
+*.aegis
+*.receipt.json
+*.aegis-private.json
+
+# Local configuration
+.env
+.vscode/
+.idea/
+
+# Build output
+build/
+dist/
+*.spec
+
+# OS files
+Thumbs.db
+.DS_Store
