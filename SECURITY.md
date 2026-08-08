@@ -1,22 +1,24 @@
-# Security notes
+# Security
 
-AegisCrypt is an educational and portfolio project. It has not undergone an independent professional security audit and should not be treated as a replacement for established, reviewed encryption products in high-risk environments.
+AegisCrypt is an educational and portfolio project. Version 7 adds stronger authenticity and testing features, but the project has not undergone an independent professional security audit.
 
-## Sensitive files
+## Do not publish secrets
 
-The repository is configured to ignore:
+The repository ignores private identity files, `.aegis` files, generated receipts, virtual environments, and local configuration. Do not commit real passphrases, private keys, confidential plaintext, or sensitive encrypted artifacts.
 
-- private identity files
-- `.aegis` encrypted files
-- generated security receipts
-- virtual environments and local configuration
+## Reporting a security problem
 
-Do not commit real private keys, passphrases, or confidential test data.
+Do not paste real keys, passwords, private files, or confidential data into a public GitHub issue.
 
-## Reporting a problem
-
-If you find a security problem in the code, avoid posting real keys, passwords, or sensitive files in a public issue. Describe the behavior and the affected component without including secrets.
+A useful report should identify the affected component, the behavior you expected, the behavior you observed, and a minimal reproduction that contains no real secrets.
 
 ## Current limitations
 
-The present build does not provide post-quantum key encapsulation, threshold recovery, hardware-backed key storage, or an external security audit.
+AegisCrypt 7 does not provide:
+
+- post-quantum key encapsulation
+- threshold recovery
+- hardware-backed private keys
+- independent security certification
+
+See `THREAT_MODEL.md` for the assumptions behind the current implementation.

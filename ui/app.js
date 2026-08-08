@@ -8,7 +8,8 @@ const pageMeta = {
   dashboard: ["Dashboard", "Overview of the current workspace."],
   encrypt: ["Encrypt", "Protect a local file."],
   decrypt: ["Decrypt", "Recover a verified plaintext file."],
-  identity: ["Identities", "Create recipient key pairs."],
+  identity: ["Identities", "Create encryption and signing identities."],
+  contacts: ["Contacts", "Manage local trust decisions for public identities."],
   inspect: ["Inspect & Verify", "Read and authenticate AegisCrypt capsules."],
   attack: ["Attack Lab", "Run controlled tamper tests."],
   planner: ["Policy Planner", "Map requirements to available protection."],
@@ -134,6 +135,8 @@ async function run() {
   $("encryptPassword").addEventListener("input", updateStrength);
 
   $("pickEncryptFile").onclick = () => chooseSingle("encryptFile").catch((e) => toast(e.message, true));
+  $("pickEncryptSigner").onclick = () => chooseSingle("encryptSignerIdentity").catch((e) => toast(e.message, true));
+  $("pickContactIdentity").onclick = () => chooseSingle("contactPublicIdentity").catch((e) => toast(e.message, true));
   $("pickDecryptFile").onclick = () => chooseSingle("decryptFile").catch((e) => toast(e.message, true));
   $("pickDecryptIdentity").onclick = () => chooseSingle("decryptIdentity").catch((e) => toast(e.message, true));
   $("pickInspectFile").onclick = () => chooseSingle("inspectFile").catch((e) => toast(e.message, true));
@@ -170,9 +173,11 @@ async function run() {
           input,
           password,
           $("encryptProfile").value,
+          $("encryptSignerIdentity").value || null,
+          $("encryptSignerPassphrase").value || null,
         );
 
-        clearSecretFields("encryptPassword", "encryptPasswordConfirm");
+        clearSecretFields("encryptPassword", "encryptPasswordConfirm", "encryptSignerPassphrase");
         updateStrength();
       } else {
         if (!state.recipientKeys.length) {
@@ -183,7 +188,10 @@ async function run() {
           "encrypt_recipients",
           input,
           state.recipientKeys,
+          $("encryptSignerIdentity").value || null,
+          $("encryptSignerPassphrase").value || null,
         );
+        clearSecretFields("encryptSignerPassphrase");
       }
 
       toast(`Encrypted: ${result.output}`);
@@ -226,6 +234,32 @@ async function run() {
       const result = await bridgeCall("generate_identity", name, passphrase);
       clearSecretFields("identityPassphrase", "identityPassphraseConfirm");
       toast(`Identity created: ${result.public_key}`);
+    } catch (e) {
+      toast(e.message, true);
+    }
+  };
+
+  $("contactImportAction").onclick = async () => {
+    try {
+      const publicIdentity = $("contactPublicIdentity").value;
+      if (!publicIdentity) throw new Error("Choose a public identity first.");
+
+      const result = await bridgeCall(
+        "import_contact",
+        publicIdentity,
+        $("contactTrust").value,
+      );
+      $("contactsResult").textContent = pretty(result.contact);
+      toast(`Contact imported: ${result.contact.name}`);
+    } catch (e) {
+      toast(e.message, true);
+    }
+  };
+
+  $("contactsRefreshAction").onclick = async () => {
+    try {
+      const result = await bridgeCall("list_contacts");
+      $("contactsResult").textContent = pretty(result.contacts);
     } catch (e) {
       toast(e.message, true);
     }

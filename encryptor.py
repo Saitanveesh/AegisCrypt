@@ -6,9 +6,11 @@ from pathlib import Path
 
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
-from container_format import build_prefix
+from container_format import build_prefix, build_signature_trailer
 from envelope import wrap_key_for_recipients, wrap_key_with_password
-from util import b64e, canonical_json_bytes
+from signatures import create_signature_document, unsigned_signature_document
+from util import b64d, b64e, canonical_json_bytes
+from version import __version__
 
 CHUNK_SIZE = 1024 * 1024
 
@@ -27,12 +29,18 @@ def _encrypt_stream(
     destination: Path,
     data_key: bytes,
     header: dict,
+    *,
+    signer_identity_path: str | Path | None = None,
+    signer_passphrase: str | None = None,
 ) -> Path:
+    if bool(signer_identity_path) != bool(signer_passphrase):
+        raise ValueError(
+            "Signing requires both a private identity file and its passphrase."
+        )
+
     header_bytes = canonical_json_bytes(header)
     prefix = build_prefix(header_bytes)
     aad = prefix + header_bytes
-
-    from util import b64d
     payload_nonce = b64d(header["payload"]["nonce"])
 
     encryptor = Cipher(
@@ -55,7 +63,6 @@ def _encrypt_stream(
         with source.open("rb") as src, temp_path.open("xb") as out:
             out.write(prefix)
             out.write(header_bytes)
-
             out.write(encryptor.update(_metadata_bytes(source)))
 
             while True:
@@ -69,6 +76,23 @@ def _encrypt_stream(
             out.flush()
             os.fsync(out.fileno())
 
+        signed_region_end = temp_path.stat().st_size
+
+        if signer_identity_path:
+            signature_doc = create_signature_document(
+                temp_path,
+                signed_region_end,
+                signer_identity_path,
+                signer_passphrase or "",
+            )
+        else:
+            signature_doc = unsigned_signature_document()
+
+        with temp_path.open("ab") as out:
+            out.write(build_signature_trailer(signature_doc))
+            out.flush()
+            os.fsync(out.fileno())
+
         os.replace(temp_path, destination)
     except Exception:
         temp_path.unlink(missing_ok=True)
@@ -77,11 +101,29 @@ def _encrypt_stream(
     return destination
 
 
+def _base_header(mode: str, payload_nonce: bytes, key_management: dict) -> dict:
+    return {
+        "format": "AEGIS-CAPSULE",
+        "created_with": __version__,
+        "mode": mode,
+        "payload": {
+            "algorithm": "AES-256-GCM",
+            "nonce": b64e(payload_nonce),
+        },
+        "key_management": key_management,
+        "metadata": "encrypted",
+        "sender_authentication": "none",
+    }
+
+
 def encrypt_password_file(
     input_path: str | Path,
     password: str,
     profile_name: str = "personal",
     output_path: str | Path | None = None,
+    *,
+    signer_identity_path: str | Path | None = None,
+    signer_passphrase: str | None = None,
 ) -> Path:
     source = Path(input_path)
 
@@ -96,26 +138,22 @@ def encrypt_password_file(
 
     data_key = os.urandom(32)
     payload_nonce = os.urandom(12)
-
-    header = {
-        "mode": "password",
-        "payload": {
-            "algorithm": "AES-256-GCM",
-            "nonce": b64e(payload_nonce),
-        },
-        "key_management": wrap_key_with_password(
-            data_key,
-            password,
-            profile_name,
-        ),
-        "metadata": "encrypted",
-    }
+    header = _base_header(
+        "password",
+        payload_nonce,
+        wrap_key_with_password(data_key, password, profile_name),
+    )
+    header["sender_authentication"] = (
+        "ed25519" if signer_identity_path else "none"
+    )
 
     return _encrypt_stream(
         source,
         destination,
         data_key,
         header,
+        signer_identity_path=signer_identity_path,
+        signer_passphrase=signer_passphrase,
     )
 
 
@@ -123,6 +161,9 @@ def encrypt_recipient_file(
     input_path: str | Path,
     public_key_paths: list[str],
     output_path: str | Path | None = None,
+    *,
+    signer_identity_path: str | Path | None = None,
+    signer_passphrase: str | None = None,
 ) -> Path:
     source = Path(input_path)
 
@@ -137,23 +178,20 @@ def encrypt_recipient_file(
 
     data_key = os.urandom(32)
     payload_nonce = os.urandom(12)
-
-    header = {
-        "mode": "recipient",
-        "payload": {
-            "algorithm": "AES-256-GCM",
-            "nonce": b64e(payload_nonce),
-        },
-        "key_management": wrap_key_for_recipients(
-            data_key,
-            public_key_paths,
-        ),
-        "metadata": "encrypted",
-    }
+    header = _base_header(
+        "recipient",
+        payload_nonce,
+        wrap_key_for_recipients(data_key, public_key_paths),
+    )
+    header["sender_authentication"] = (
+        "ed25519" if signer_identity_path else "none"
+    )
 
     return _encrypt_stream(
         source,
         destination,
         data_key,
         header,
+        signer_identity_path=signer_identity_path,
+        signer_passphrase=signer_passphrase,
     )

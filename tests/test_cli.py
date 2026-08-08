@@ -4,7 +4,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -18,4 +17,4 @@ def test_version_command():
     )
 
     assert result.returncode == 0
-    assert result.stdout.strip() == "AegisCrypt 0.9.2"
+    assert result.stdout.strip() == "AegisCrypt 7.0.0"

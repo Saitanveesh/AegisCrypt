@@ -9,6 +9,8 @@ from policy import recommend_profile
 class ProtectionPlan:
     profile: str
     ready_now: bool
+    recommended_mode: str
+    sender_signature_recommended: bool
     current_capabilities: list[str]
     missing_capabilities: list[str]
     rationale: list[str]
@@ -21,21 +23,15 @@ def compile_protection_plan(
     recovery: str,
     quantum: str,
 ) -> ProtectionPlan:
-    profile = recommend_profile(
-        sensitivity,
-        retention_years,
-    )
-
+    profile = recommend_profile(sensitivity, retention_years)
     sharing = sharing.lower()
     recovery = recovery.lower()
     quantum = quantum.lower()
 
     if sharing not in {"none", "one", "many"}:
         raise ValueError("Sharing must be: none, one, or many.")
-
     if recovery not in {"none", "single", "threshold"}:
         raise ValueError("Recovery must be: none, single, or threshold.")
-
     if quantum not in {"no", "preferred", "required"}:
         raise ValueError("Quantum must be: no, preferred, or required.")
 
@@ -44,27 +40,32 @@ def compile_protection_plan(
         "Argon2id password protection",
         "X25519 public-key recipient encryption",
         "Multi-recipient envelope encryption",
+        "Ed25519 sender signatures",
+        "Local contact trust states",
         "Encrypted filename and size metadata",
-        "Security receipt and verification",
+        "Security receipts and verification",
         "Controlled tamper simulation",
-        "Desktop HTML/CSS/JS interface",
     ]
 
-    missing = []
+    missing: list[str] = []
     rationale = [
         f"Base password profile: {profile.name} "
         f"(sensitivity={sensitivity}, retention={retention_years} years)."
     ]
 
     if sharing == "none":
+        recommended_mode = "password"
         rationale.append("Local-only protection can use password mode.")
-    elif sharing == "one":
-        rationale.append(
-            "One-recipient public-key encryption is implemented."
-        )
     else:
+        recommended_mode = "recipient"
         rationale.append(
-            "Multi-recipient envelope encryption is implemented."
+            "Recipient mode avoids sharing one password between multiple people."
+        )
+
+    sender_signature_recommended = sharing != "none" or sensitivity in {"sensitive", "high"}
+    if sender_signature_recommended:
+        rationale.append(
+            "A sender signature is recommended so recipients can verify who produced the capsule."
         )
 
     if recovery == "single":
@@ -73,9 +74,7 @@ def compile_protection_plan(
         missing.append("Threshold recovery shares")
 
     if quantum == "preferred":
-        missing.append(
-            "Hybrid classical + post-quantum recipient protection"
-        )
+        missing.append("Hybrid classical + post-quantum recipient protection")
     elif quantum == "required":
         missing.extend(
             [
@@ -87,6 +86,8 @@ def compile_protection_plan(
     return ProtectionPlan(
         profile=profile.name,
         ready_now=not missing,
+        recommended_mode=recommended_mode,
+        sender_signature_recommended=sender_signature_recommended,
         current_capabilities=current,
         missing_capabilities=missing,
         rationale=rationale,

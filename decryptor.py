@@ -8,9 +8,15 @@ from pathlib import Path
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
-from container_format import GCM_TAG_SIZE, read_header
+from container_format import (
+    GCM_TAG_SIZE,
+    encrypted_region_end,
+    read_header,
+    read_signature_trailer,
+)
 from envelope import unwrap_key_for_identity, unwrap_key_with_password
 from keys import load_private_identity
+from signatures import enforce_signature_policy, verify_signature_document
 from util import b64d, unique_path
 
 CHUNK_SIZE = 1024 * 1024
@@ -43,11 +49,7 @@ def recover_data_key(
             identity_path,
             identity_passphrase,
         )
-        return unwrap_key_for_identity(
-            km,
-            fingerprint,
-            private_key,
-        )
+        return unwrap_key_for_identity(km, fingerprint, private_key)
 
     raise ValueError(f"Unsupported AegisCrypt mode: {mode}")
 
@@ -55,17 +57,21 @@ def recover_data_key(
 def _ciphertext_layout(
     source: Path,
     payload_offset: int,
+    prefix: bytes,
 ) -> tuple[int, bytes]:
-    total_size = source.stat().st_size
+    encrypted_end = encrypted_region_end(source, prefix=prefix)
 
-    if total_size <= payload_offset + GCM_TAG_SIZE:
+    if encrypted_end <= payload_offset + GCM_TAG_SIZE:
         raise ValueError("Incomplete encrypted payload.")
 
-    ciphertext_len = total_size - payload_offset - GCM_TAG_SIZE
+    ciphertext_len = encrypted_end - payload_offset - GCM_TAG_SIZE
 
     with source.open("rb") as src:
-        src.seek(total_size - GCM_TAG_SIZE)
+        src.seek(encrypted_end - GCM_TAG_SIZE)
         tag = src.read(GCM_TAG_SIZE)
+
+    if len(tag) != GCM_TAG_SIZE:
+        raise ValueError("Incomplete authentication tag.")
 
     return ciphertext_len, tag
 
@@ -78,7 +84,7 @@ def authenticate_payload(
     header: dict,
     payload_offset: int,
 ) -> None:
-    ciphertext_len, tag = _ciphertext_layout(source, payload_offset)
+    ciphertext_len, tag = _ciphertext_layout(source, payload_offset, prefix)
 
     decryptor = Cipher(
         algorithms.AES(data_key),
@@ -124,7 +130,7 @@ def _decrypt_verified_to_output(
     payload_offset: int,
     output_path: str | Path | None,
 ) -> Path:
-    ciphertext_len, tag = _ciphertext_layout(source, payload_offset)
+    ciphertext_len, tag = _ciphertext_layout(source, payload_offset, prefix)
 
     decryptor = Cipher(
         algorithms.AES(data_key),
@@ -156,15 +162,14 @@ def _decrypt_verified_to_output(
 
                     if len(pending) >= 4:
                         metadata_len = struct.unpack(">I", pending[:4])[0]
-
                         if metadata_len <= 0 or metadata_len > MAX_METADATA_SIZE:
                             raise ValueError("Invalid encrypted metadata length.")
 
                         total_meta = 4 + metadata_len
-
                         if len(pending) >= total_meta:
-                            metadata_raw = bytes(pending[4:total_meta])
-                            metadata = json.loads(metadata_raw.decode("utf-8"))
+                            metadata = json.loads(
+                                bytes(pending[4:total_meta]).decode("utf-8")
+                            )
 
                             if output_path is not None:
                                 destination = Path(output_path)
@@ -173,16 +178,10 @@ def _decrypt_verified_to_output(
                                     metadata.get("original_name", "")
                                 )
                                 destination = unique_path(
-                                    source.with_name(
-                                        original_name + ".decrypted"
-                                    )
+                                    source.with_name(original_name + ".decrypted")
                                 )
 
-                            destination.parent.mkdir(
-                                parents=True,
-                                exist_ok=True,
-                            )
-
+                            destination.parent.mkdir(parents=True, exist_ok=True)
                             if destination.exists():
                                 raise FileExistsError(
                                     f"Output already exists: {destination}."
@@ -201,7 +200,6 @@ def _decrypt_verified_to_output(
 
             if metadata is None:
                 pending.extend(final_plain)
-
                 if len(pending) < 4:
                     raise ValueError("Encrypted metadata is incomplete.")
 
@@ -215,9 +213,7 @@ def _decrypt_verified_to_output(
                 ):
                     raise ValueError("Encrypted metadata is incomplete.")
 
-                metadata = json.loads(
-                    bytes(pending[4:total_meta]).decode("utf-8")
-                )
+                metadata = json.loads(bytes(pending[4:total_meta]).decode("utf-8"))
 
                 if output_path is not None:
                     destination = Path(output_path)
@@ -229,13 +225,8 @@ def _decrypt_verified_to_output(
                         source.with_name(original_name + ".decrypted")
                     )
 
-                destination.parent.mkdir(
-                    parents=True,
-                    exist_ok=True,
-                )
-                temp_output = destination.with_name(
-                    destination.name + ".tmp"
-                )
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                temp_output = destination.with_name(destination.name + ".tmp")
                 out = temp_output.open("xb")
                 out.write(pending[total_meta:])
             else:
@@ -263,6 +254,7 @@ def decrypt_file(
     identity_path: str | Path | None = None,
     identity_passphrase: str | None = None,
     output_path: str | Path | None = None,
+    trust_store_path: str | Path | None = None,
 ) -> Path:
     source = Path(input_path)
 
@@ -277,7 +269,7 @@ def decrypt_file(
         identity_passphrase,
     )
 
-    # Pass 1 authenticates without writing plaintext to disk.
+    # Authenticate first. Plaintext is not written until this pass succeeds.
     authenticate_payload(
         source,
         data_key,
@@ -287,7 +279,19 @@ def decrypt_file(
         payload_offset,
     )
 
-    # Pass 2 writes plaintext only after the capsule has authenticated.
+    signature_doc, signed_region_end = read_signature_trailer(
+        source, prefix=prefix
+    )
+    enforce_signature_policy(header, signature_doc)
+    signature_report = verify_signature_document(
+        source,
+        signature_doc,
+        signed_region_end,
+        trust_store_path=trust_store_path,
+    )
+    if signature_report.get("trust_status") == "blocked":
+        raise ValueError("Capsule is signed by a locally blocked identity.")
+
     return _decrypt_verified_to_output(
         source,
         data_key,
