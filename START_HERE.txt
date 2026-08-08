@@ -1,7 +1,7 @@
-AEGISCRYPT - QUICK START
-=======================
+AEGISCRYPT 7.0.0
+================
 
-Windows / VS Code terminal:
+Windows / VS Code terminal
 
 1. Create the environment
    python -m venv .venv
@@ -15,10 +15,18 @@ Windows / VS Code terminal:
 4. Start the desktop application
    python desktop.py
 
-CLI version check:
+Version check
    python main.py --version
 
-Expected:
-   AegisCrypt 0.9.2
+Expected
+   AegisCrypt 7.0.0
 
-Live Server can be used to preview ui/index.html, but cryptographic actions require the desktop application because the browser preview does not have access to the Python engine.
+New in version 7
+- X25519 + Ed25519 identities
+- optional sender-signed capsules
+- local contact trust states
+- Security Receipt v2
+- expanded Attack Lab
+- version-4 capsule compatibility
+
+Live Server can preview ui/index.html, but cryptographic actions require the desktop application because the browser preview cannot call the local Python engine.
