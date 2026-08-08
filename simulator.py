@@ -131,6 +131,16 @@ def simulate_attacks(
     run("Extra byte appended", original + b"\x00")
 
     if signature_doc and signature_doc.get("signed"):
+        unsigned = {
+            "format": "AEGIS-SIGNATURE",
+            "version": 1,
+            "signed": False,
+        }
+        run(
+            "Sender signature removed",
+            original[:signature_start] + build_signature_trailer(unsigned),
+        )
+
         s = dict(signature_doc)
         sig = bytearray(b64d(s["signature"]))
         sig[0] ^= 1
