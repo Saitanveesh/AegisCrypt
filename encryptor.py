@@ -112,6 +112,7 @@ def _base_header(mode: str, payload_nonce: bytes, key_management: dict) -> dict:
         },
         "key_management": key_management,
         "metadata": "encrypted",
+        "sender_authentication": "none",
     }
 
 
@@ -141,6 +142,9 @@ def encrypt_password_file(
         "password",
         payload_nonce,
         wrap_key_with_password(data_key, password, profile_name),
+    )
+    header["sender_authentication"] = (
+        "ed25519" if signer_identity_path else "none"
     )
 
     return _encrypt_stream(
@@ -178,6 +182,9 @@ def encrypt_recipient_file(
         "recipient",
         payload_nonce,
         wrap_key_for_recipients(data_key, public_key_paths),
+    )
+    header["sender_authentication"] = (
+        "ed25519" if signer_identity_path else "none"
     )
 
     return _encrypt_stream(
