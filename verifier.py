@@ -10,7 +10,7 @@ from container_format import (
     read_signature_trailer,
 )
 from decryptor import authenticate_payload, recover_data_key
-from signatures import verify_signature_document
+from signatures import enforce_signature_policy, verify_signature_document
 from util import atomic_write_text, sha256_file
 from version import __version__
 
@@ -33,6 +33,7 @@ def inspect_file(input_path: str | Path) -> dict:
         ]
 
     signed = bool(signature_doc and signature_doc.get("signed"))
+    sender_authentication = header.get("sender_authentication", "none")
 
     return {
         "container": "AEGIS",
@@ -46,6 +47,7 @@ def inspect_file(input_path: str | Path) -> dict:
         ),
         "recipient_count": len(recipients),
         "recipient_fingerprints": recipients,
+        "sender_authentication": sender_authentication,
         "signed": signed,
         "signer_name": signature_doc.get("signer_name") if signed else None,
         "signing_fingerprint": (
@@ -68,6 +70,7 @@ def verify_file(
     source = Path(input_path)
     prefix, header_bytes, header, payload_offset = read_header(source)
     signature_doc, signed_region_end = read_signature_trailer(source, prefix=prefix)
+    enforce_signature_policy(header, signature_doc)
 
     data_key = recover_data_key(
         header,
