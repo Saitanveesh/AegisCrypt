@@ -60,6 +60,24 @@ def create_signature_document(
     }
 
 
+def enforce_signature_policy(header: dict, document: dict | None) -> None:
+    expected = header.get("sender_authentication", "none")
+    if expected not in {"none", "ed25519"}:
+        raise ValueError("Unsupported sender-authentication policy.")
+
+    signed = bool(document and document.get("signed"))
+
+    if expected == "ed25519" and not signed:
+        raise ValueError(
+            "Capsule requires an Ed25519 sender signature, but none is present."
+        )
+
+    if expected == "none" and signed:
+        raise ValueError(
+            "Capsule signature trailer conflicts with the authenticated header policy."
+        )
+
+
 def verify_signature_document(
     path: str | Path,
     document: dict | None,
