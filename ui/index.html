@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AegisCrypt</title>
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand-block">
+        <div class="brand-name">AegisCrypt</div>
+        <div class="brand-sub">Local file protection</div>
+      </div>
+
+      <div class="nav-label">Workspace</div>
+      <nav id="nav">
+        <button class="nav-item active" data-page="dashboard">Dashboard</button>
+        <button class="nav-item" data-page="encrypt">Encrypt</button>
+        <button class="nav-item" data-page="decrypt">Decrypt</button>
+        <button class="nav-item" data-page="identity">Identities</button>
+        <button class="nav-item" data-page="inspect">Inspect & Verify</button>
+        <button class="nav-item" data-page="attack">Attack Lab</button>
+        <button class="nav-item" data-page="planner">Policy Planner</button>
+      </nav>
+    </aside>
+
+    <main class="workspace">
+      <header class="topbar">
+        <div>
+          <h1 id="pageTitle">Dashboard</h1>
+          <p id="pageSubtitle">Overview of the current workspace.</p>
+        </div>
+        <div class="top-status">
+          <span class="chip">AES-256-GCM</span>
+          <span class="chip">X25519</span>
+          <span class="chip">Local-first</span>
+        </div>
+      </header>
+
+      <div id="previewBanner" class="banner hidden">
+        Preview mode only. Open the interface through <strong>python desktop.py</strong> to use encryption, decryption, and file actions.
+      </div>
+
+      <section class="page active" id="page-dashboard">
+        <div class="overview-card">
+          <div class="overview-copy">
+            <div class="section-kicker">Overview</div>
+            <h2>Protect, verify, and manage files from one local workspace.</h2>
+            <p>
+              Use password protection or recipient-based encryption, inspect capsules,
+              generate receipts, and run controlled tamper checks without leaving the application.
+            </p>
+          </div>
+          <div class="overview-actions">
+            <button class="primary" data-go="encrypt">Encrypt file</button>
+            <button class="secondary" data-go="identity">Create identity</button>
+          </div>
+        </div>
+
+        <div class="metric-grid">
+          <div class="metric-card">
+            <span class="metric-label">Payload protection</span>
+            <strong>AES-256-GCM</strong>
+            <small>Authenticated file encryption</small>
+          </div>
+          <div class="metric-card">
+            <span class="metric-label">Password hardening</span>
+            <strong>Argon2id</strong>
+            <small>Profile-controlled key derivation</small>
+          </div>
+          <div class="metric-card">
+            <span class="metric-label">Recipient access</span>
+            <strong>X25519</strong>
+            <small>Single and multi-recipient support</small>
+          </div>
+          <div class="metric-card">
+            <span class="metric-label">Metadata handling</span>
+            <strong>Encrypted</strong>
+            <small>Filename and size are protected</small>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h3>Current scope</h3>
+              <p>A practical boundary for what this build does today.</p>
+            </div>
+          </div>
+          <div class="two-col">
+            <div>
+              <h4>Included</h4>
+              <ul class="clean-list">
+                <li>Password-based encryption</li>
+                <li>Recipient-based encryption</li>
+                <li>Multi-recipient access control</li>
+                <li>Verification and security receipts</li>
+                <li>Controlled tamper simulation</li>
+                <li>Policy planning</li>
+              </ul>
+            </div>
+            <div>
+              <h4>Not in this build</h4>
+              <ul class="clean-list muted">
+                <li>Post-quantum protection</li>
+                <li>Threshold recovery</li>
+                <li>Independent security audit</li>
+                <li>External cloud sync</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="page" id="page-encrypt">
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h3>Encrypt file</h3>
+              <p>Select a protection mode and choose a local file.</p>
+            </div>
+          </div>
+
+          <div class="segmented" id="encryptMode">
+            <button class="segment active" data-mode="password">Password</button>
+            <button class="segment" data-mode="recipient">Recipients</button>
+          </div>
+
+          <div class="field">
+            <label>Input file</label>
+            <div class="file-row">
+              <input id="encryptFile" readonly placeholder="No file selected">
+              <button class="secondary" id="pickEncryptFile">Browse</button>
+            </div>
+          </div>
+
+          <div id="passwordEncryptFields">
+            <div class="field">
+              <label>Security profile</label>
+              <select id="encryptProfile">
+                <option value="personal">Personal</option>
+                <option value="hardened" selected>Hardened</option>
+                <option value="archive">Archive</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label>Password</label>
+              <input id="encryptPassword" type="password" autocomplete="new-password">
+              <div class="strength">
+                <div class="strength-bar"><span id="strengthFill"></span></div>
+                <small id="strengthText">Enter a password</small>
+              </div>
+            </div>
+
+            <div class="field">
+              <label>Confirm password</label>
+              <input id="encryptPasswordConfirm" type="password" autocomplete="new-password">
+            </div>
+          </div>
+
+          <div id="recipientEncryptFields" class="hidden">
+            <div class="field">
+              <label>Recipient public keys</label>
+              <div class="file-row">
+                <input id="recipientKeys" readonly placeholder="No public keys selected">
+                <button class="secondary" id="pickRecipientKeys">Browse</button>
+              </div>
+              <small class="hint">Choose one or more .aegis-public.json files.</small>
+            </div>
+          </div>
+
+          <div class="action-row">
+            <button class="primary" id="encryptAction">Encrypt file</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="page" id="page-decrypt">
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h3>Decrypt capsule</h3>
+              <p>The application detects whether the capsule uses a password or recipient identity.</p>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>.aegis file</label>
+            <div class="file-row">
+              <input id="decryptFile" readonly placeholder="No capsule selected">
+              <button class="secondary" id="pickDecryptFile">Browse</button>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Password</label>
+            <input id="decryptPassword" type="password" placeholder="Used for password-based capsules">
+          </div>
+
+          <div class="field">
+            <label>Private identity</label>
+            <div class="file-row">
+              <input id="decryptIdentity" readonly placeholder="Used for recipient-based capsules">
+              <button class="secondary" id="pickDecryptIdentity">Browse</button>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Private-key passphrase</label>
+            <input id="decryptIdentityPassphrase" type="password">
+          </div>
+
+          <div class="action-row">
+            <button class="primary" id="decryptAction">Decrypt and verify</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="page" id="page-identity">
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h3>Create recipient identity</h3>
+              <p>Create an X25519 public key and a passphrase-protected private key.</p>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Identity name</label>
+            <input id="identityName" placeholder="alice">
+          </div>
+
+          <div class="field">
+            <label>Private-key passphrase</label>
+            <input id="identityPassphrase" type="password">
+          </div>
+
+          <div class="field">
+            <label>Confirm passphrase</label>
+            <input id="identityPassphraseConfirm" type="password">
+          </div>
+
+          <div class="action-row">
+            <button class="primary" id="identityAction">Create identity</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="page" id="page-inspect">
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h3>Inspect and verify</h3>
+              <p>Inspection reads public container metadata. Verification authenticates the capsule.</p>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>.aegis file</label>
+            <div class="file-row">
+              <input id="inspectFile" readonly placeholder="No capsule selected">
+              <button class="secondary" id="pickInspectFile">Browse</button>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Password</label>
+            <input id="inspectPassword" type="password">
+          </div>
+
+          <div class="field">
+            <label>Private identity</label>
+            <div class="file-row">
+              <input id="inspectIdentity" readonly placeholder="Optional recipient identity">
+              <button class="secondary" id="pickInspectIdentity">Browse</button>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Private-key passphrase</label>
+            <input id="inspectIdentityPassphrase" type="password">
+          </div>
+
+          <div class="action-row">
+            <button class="secondary" id="inspectAction">Inspect</button>
+            <button class="primary" id="verifyAction">Verify</button>
+            <button class="secondary" id="receiptAction">Create receipt</button>
+          </div>
+
+          <pre class="result" id="inspectResult">No report yet.</pre>
+        </div>
+      </section>
+
+      <section class="page" id="page-attack">
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h3>Attack Lab</h3>
+              <p>Run controlled tamper tests against a verified capsule without altering the original file.</p>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>.aegis file</label>
+            <div class="file-row">
+              <input id="attackFile" readonly placeholder="No capsule selected">
+              <button class="secondary" id="pickAttackFile">Browse</button>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Password</label>
+            <input id="attackPassword" type="password">
+          </div>
+
+          <div class="field">
+            <label>Private identity</label>
+            <div class="file-row">
+              <input id="attackIdentity" readonly placeholder="Optional recipient identity">
+              <button class="secondary" id="pickAttackIdentity">Browse</button>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Private-key passphrase</label>
+            <input id="attackIdentityPassphrase" type="password">
+          </div>
+
+          <div class="action-row">
+            <button class="primary" id="attackAction">Run controlled tests</button>
+          </div>
+
+          <div id="attackResults" class="attack-results"></div>
+        </div>
+      </section>
+
+      <section class="page" id="page-planner">
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h3>Policy Planner</h3>
+              <p>Translate practical requirements into an honest capability plan.</p>
+            </div>
+          </div>
+
+          <div class="form-grid">
+            <div class="field">
+              <label>Sensitivity</label>
+              <select id="planSensitivity">
+                <option value="normal">Normal</option>
+                <option value="sensitive">Sensitive</option>
+                <option value="high">High</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label>Retention years</label>
+              <input id="planYears" type="number" min="0" value="5">
+            </div>
+
+            <div class="field">
+              <label>Sharing</label>
+              <select id="planSharing">
+                <option value="none">None</option>
+                <option value="one">One recipient</option>
+                <option value="many">Many recipients</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label>Recovery</label>
+              <select id="planRecovery">
+                <option value="none">None</option>
+                <option value="single">Single recovery key</option>
+                <option value="threshold">Threshold recovery</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label>Post-quantum requirement</label>
+              <select id="planQuantum">
+                <option value="no">No</option>
+                <option value="preferred">Preferred</option>
+                <option value="required">Required</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="action-row">
+            <button class="primary" id="planAction">Build protection plan</button>
+          </div>
+
+          <pre class="result" id="planResult">No plan yet.</pre>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <script src="app.js"></script>
+</body>
+</html>
